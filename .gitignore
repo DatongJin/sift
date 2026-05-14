@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec
+!build_exe.py
+
+# Sift runtime state — strictly local
+.dupfinder_quarantine/
+.dupfinder_cache.sqlite3
+.dupfinder_cache.sqlite3-shm
+.dupfinder_cache.sqlite3-wal
+
+# Demo / scratch folders used during development
+demo_*/
+
+# IDE / editor
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+
+# OS junk
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Logs
+*.log
+
+# Local environment
+.env
+.venv/
+venv/
