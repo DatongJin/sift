@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sift — find duplicates, similar photos, and what's eating your disk</title>
+<meta name="description" content="A safe, local-only desktop tool for finding duplicate files, similar photos, empty folders, and the biggest things on your disk. Free, open source, Windows." />
+<meta property="og:title" content="Sift" />
+<meta property="og:description" content="Find duplicates, similar photos, empty folders, and what's eating your disk — safely." />
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%236b8aff'/><stop offset='100%25' stop-color='%23b06bff'/></linearGradient></defs><rect width='64' height='64' rx='14' fill='url(%23g)'/><text x='50%25' y='52%25' text-anchor='middle' dy='.35em' font-family='Segoe UI Variable,Segoe UI,sans-serif' font-weight='700' font-size='38' fill='white'>S</text></svg>" />
+
+<style>
+:root {
+  --bg: #0b0b0f;
+  --bg-grad: radial-gradient(1400px 700px at 50% -200px, #1a1a28 0%, #0b0b0f 60%);
+  --surface: #14141a;
+  --border: #25252e;
+  --text: #f2f2f5;
+  --text-dim: #a1a1ac;
+  --text-faint: #6b6b76;
+  --accent: #6b8aff;
+  --accent-hover: #8aa0ff;
+  --success: #4ade80;
+  --danger: #f25c5c;
+  --warning: #fbbf24;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f7f7fb;
+    --bg-grad: radial-gradient(1400px 700px at 50% -200px, #eef0fa 0%, #f7f7fb 60%);
+    --surface: #ffffff;
+    --border: #e3e4ec;
+    --text: #15151c;
+    --text-dim: #585864;
+    --text-faint: #8c8c98;
+    --accent: #4d6df0;
+    --accent-hover: #3955d8;
+    color-scheme: light;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--bg);
+  background-image: var(--bg-grad);
+  color: var(--text);
+  font-family: "Segoe UI Variable", "Segoe UI", -apple-system, system-ui, "Inter", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--accent); color: white; }
+
+.wrap {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 56px 24px 80px;
+}
+
+/* Header / hero */
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 56px;
+}
+.logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #6b8aff 0%, #b06bff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  box-shadow: 0 4px 16px rgba(107, 138, 255, 0.3);
+}
+.brand-name {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.brand-row .right {
+  margin-left: auto;
+  display: flex;
+  gap: 18px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+.brand-row .right a {
+  color: inherit;
+  text-decoration: none;
+  transition: color .15s;
+}
+.brand-row .right a:hover { color: var(--text); }
+
+h1 {
+  font-size: clamp(36px, 6vw, 56px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  margin-bottom: 18px;
+}
+h1 .gradient {
+  background: linear-gradient(135deg, #6b8aff 0%, #b06bff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.lead {
+  font-size: clamp(17px, 2.3vw, 21px);
+  color: var(--text-dim);
+  max-width: 640px;
+  margin-bottom: 36px;
+}
+
+/* Buttons */
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  border-radius: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 15px;
+  transition: transform .05s, background .15s, box-shadow .15s;
+  cursor: pointer;
+}
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 4px 20px rgba(107, 138, 255, 0.35);
+}
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:active { transform: translateY(1px); }
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--text-dim); }
+.btn .arrow { transition: transform .15s; }
+.btn:hover .arrow { transform: translateX(2px); }
+.tiny {
+  font-size: 13px;
+  color: var(--text-faint);
+  margin-bottom: 80px;
+}
+.tiny code {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Section */
+.section { margin-bottom: 72px; }
+.section h2 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+}
+
+/* Feature grid */
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.feature {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 22px;
+}
+.feature .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(107, 138, 255, 0.13);
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+.feature h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+.feature p {
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.feature svg { width: 18px; height: 18px; }
+
+/* Safety section */
+.safety {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+}
+.safety-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px 28px;
+  margin-top: 4px;
+}
+.safety-item {
+  display: flex;
+  gap: 12px;
+}
+.safety-item .check {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, 0.18);
+  color: var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.safety-item .check svg { width: 12px; height: 12px; }
+.safety-item h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.safety-item p {
+  font-size: 13.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* Footer */
+footer {
+  margin-top: 64px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+  font-size: 13.5px;
+  color: var(--text-faint);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+}
+footer a {
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color .15s;
+}
+footer a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="brand-row">
+    <div class="logo">S</div>
+    <div class="brand-name">Sift</div>
+    <div class="right">
+      <a href="https://github.com/DatongJin/sift" target="_blank">GitHub</a>
+      <a href="https://github.com/DatongJin/sift/releases" target="_blank">Releases</a>
+    </div>
+  </header>
+
+  <h1>Find what's eating<br/>your disk &mdash; <span class="gradient">safely.</span></h1>
+
+  <p class="lead">
+    A local-only desktop app that finds duplicate files, similar photos, empty folders,
+    and your biggest space-eaters. Everything you remove goes into a quarantine you can
+    restore from — clean up without fear.
+  </p>
+
+  <div class="cta-row">
+    <a href="https://github.com/DatongJin/sift/releases/latest/download/sift.exe" class="btn btn-primary">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v14"/><path d="m6 11 6 6 6-6"/><path d="M5 21h14"/></svg>
+      Download for Windows
+    </a>
+    <a href="https://github.com/DatongJin/sift" class="btn btn-secondary">
+      View source <span class="arrow">→</span>
+    </a>
+  </div>
+  <div class="tiny">
+    Single ~16 MB <code>sift.exe</code>. No installer, no Python required. Double-click to launch.
+  </div>
+
+  <section class="section">
+    <h2>What it finds</h2>
+    <div class="features">
+      <div class="feature">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="9" height="9" rx="1"/><rect x="12" y="12" width="9" height="9" rx="1"/><path d="m12 12 9-9"/></svg>
+        </div>
+        <h3>Duplicate files</h3>
+        <p>Byte-identical files found by SHA-256, with a three-tier filter that's fast even on TB-scale folders.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </div>
+        <h3>Similar photos</h3>
+        <p>Spot burst shots, resized copies, and slight crops via perceptual hashing. Pick the keepers, the rest are gone.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v13a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-8L9 5H4a1 1 0 0 0-1 1z"/></svg>
+        </div>
+        <h3>Empty folders</h3>
+        <p>Recursively-empty directory trees, with optional handling of junk metadata like <code>Thumbs.db</code>.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M6 21V10"/><path d="M12 21V4"/><path d="M18 21v-7"/></svg>
+        </div>
+        <h3>Largest items</h3>
+        <p>Top-N files and folders by recursive size. Answers "where did all my space go?" at a glance.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Built for trust</h2>
+    <div class="safety">
+      <div class="safety-list">
+        <div class="safety-item">
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div>
+            <h4>Quarantine by default</h4>
+            <p>Nothing is unlinked until you opt in. Restorable with one click via the manifest file.</p>
+          </div>
+        </div>
+        <div class="safety-item">
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div>
+            <h4>Local-only</h4>
+            <p>Web UI served from <code>127.0.0.1</code>; no network calls, no telemetry, no uploads. Your files never leave your machine.</p>
+          </div>
+        </div>
+        <div class="safety-item">
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div>
+            <h4>Re-validates before deleting</h4>
+            <p>File size and hash are re-checked at execute time. If a file changed since the scan, it's skipped — never silently overwritten or removed.</p>
+          </div>
+        </div>
+        <div class="safety-item">
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div>
+            <h4>Protected paths</h4>
+            <p>Mark folders that should never be deleted from, even when their contents match a duplicate group.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>Sift &middot; an open project</div>
+    <div>
+      <a href="https://github.com/DatongJin/sift" target="_blank">Source</a> &middot;
+      <a href="https://github.com/DatongJin/sift/issues" target="_blank">Report an issue</a>
+    </div>
+  </footer>
+
+</div>
+
+</body>
+</html>

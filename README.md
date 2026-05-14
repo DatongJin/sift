@@ -6,6 +6,13 @@ A local-only desktop app for cleaning up files without fear. Everything destruct
 goes through a quarantine you can restore from; the server only listens on
 `127.0.0.1` and rejects cross-origin requests.
 
+## Download
+
+[**Download Sift for Windows**](https://github.com/DatongJin/sift/releases/latest/download/sift.exe)
+(~16 MB, single .exe, no installer, no Python required).
+
+Also see the [landing page](https://datongjin.github.io/sift/) once the repo is public.
+
 ## Features
 
 | Mode | What it does |

@@ -50,6 +50,18 @@ def main() -> int:
     if spec.exists():
         spec.unlink()
 
+    # Exclude heavy scientific / dev libraries that an Anaconda install
+    # would otherwise drag in (pandas, numpy, scipy, matplotlib, etc.).
+    # Sift only needs the Python stdlib + Pillow.
+    excludes = [
+        "numpy", "pandas", "scipy", "matplotlib", "sympy",
+        "IPython", "jedi", "notebook", "jupyter", "jupyter_client",
+        "sphinx", "pytest", "pyarrow", "h5py", "tables",
+        "sklearn", "statsmodels", "seaborn", "plotly",
+        "PyQt5", "PyQt6", "PySide2", "PySide6",
+        "tornado",
+        "test",
+    ]
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--onefile",
@@ -58,8 +70,10 @@ def main() -> int:
         "--add-data", f"app_ui.html{';' if sys.platform == 'win32' else ':'}.",
         "--clean",
         "--noconfirm",
-        "dupfinder_app.py",
     ]
+    for mod in excludes:
+        cmd.extend(["--exclude-module", mod])
+    cmd.append("dupfinder_app.py")
     print("\n$ " + " ".join(cmd) + "\n")
     rc = subprocess.call(cmd, cwd=str(HERE))
     if rc != 0:

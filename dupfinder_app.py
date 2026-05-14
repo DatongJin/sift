@@ -435,60 +435,73 @@ def _run_scan_job(
 
 
 # =============================================================================
-# Native folder / file pickers (run in a subprocess so they don't fight the
-# server's thread model).
+# Native folder / file pickers
+#
+# We launch Tk in a daemon thread (not a subprocess), which works inside both
+# script mode and the PyInstaller-bundled exe. A lock serializes pickers so
+# two simultaneous clicks can't fight over the Tk root.
 # =============================================================================
 
-_DPI_PRELUDE = r"""
-import sys
-if sys.platform == 'win32':
+_picker_lock = threading.Lock()
+
+
+def _set_process_dpi_aware() -> None:
+    """Make this process HiDPI-aware so the native dialog isn't bitmap-scaled."""
+    if sys.platform != "win32":
+        return
     try:
         import ctypes
-        # 2 = PROCESS_PER_MONITOR_DPI_AWARE (Win 8.1+). Falls back for older.
         ctypes.windll.shcore.SetProcessDpiAwareness(2)
-    except Exception:
+    except Exception:  # noqa: BLE001
         try:
             ctypes.windll.user32.SetProcessDPIAware()
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
-"""
-
-_PICK_FOLDER_SNIPPET = _DPI_PRELUDE + r"""
-import tkinter as tk
-from tkinter import filedialog
-root = tk.Tk()
-root.withdraw()
-root.attributes('-topmost', True)
-p = filedialog.askdirectory(parent=root, title='Pick a folder to scan')
-root.destroy()
-sys.stdout.write(p or '')
-"""
-
-_PICK_MANIFEST_SNIPPET = _DPI_PRELUDE + r"""
-import tkinter as tk
-from tkinter import filedialog
-root = tk.Tk()
-root.withdraw()
-root.attributes('-topmost', True)
-p = filedialog.askopenfilename(
-    parent=root,
-    title='Pick a quarantine manifest',
-    filetypes=[('Manifest', 'manifest.json'), ('JSON', '*.json'), ('All files', '*.*')],
-)
-root.destroy()
-sys.stdout.write(p or '')
-"""
 
 
-def _pick(snippet: str) -> str:
+def _pick(kind: str) -> str:
+    """Show a native folder/file picker and return the chosen path (or '')."""
+    if not _picker_lock.acquire(blocking=False):
+        return ""  # another picker is open; ignore concurrent click
+
+    import queue
+    result: queue.Queue[str] = queue.Queue()
+
+    def worker() -> None:
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            try:
+                if kind == "folder":
+                    p = filedialog.askdirectory(parent=root,
+                                                title="Pick a folder to scan")
+                else:
+                    p = filedialog.askopenfilename(
+                        parent=root,
+                        title="Pick a quarantine manifest",
+                        filetypes=[
+                            ("Manifest", "manifest.json"),
+                            ("JSON", "*.json"),
+                            ("All files", "*.*"),
+                        ],
+                    )
+            finally:
+                root.destroy()
+            result.put(p or "")
+        except Exception:  # noqa: BLE001
+            result.put("")
+
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
     try:
-        r = subprocess.run(
-            [sys.executable, "-c", snippet],
-            capture_output=True, text=True, timeout=300,
-        )
-        return r.stdout.strip()
-    except Exception:  # noqa: BLE001
+        return result.get(timeout=300)
+    except Exception:  # noqa: BLE001  — timeout etc.
         return ""
+    finally:
+        _picker_lock.release()
 
 
 # =============================================================================
@@ -595,9 +608,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def _dispatch_post(self) -> None:
         data = self._read_json()
         if self.path == "/api/browse_folder":
-            self._send_json({"path": _pick(_PICK_FOLDER_SNIPPET)})
+            self._send_json({"path": _pick("folder")})
         elif self.path == "/api/browse_manifest":
-            self._send_json({"path": _pick(_PICK_MANIFEST_SNIPPET)})
+            self._send_json({"path": _pick("manifest")})
         elif self.path == "/api/scan":
             self._handle_scan(data)
         elif self.path == "/api/scan_start":
@@ -1091,6 +1104,7 @@ def main() -> int:
         print(f"error: UI file missing: {UI_FILE}", file=sys.stderr)
         return 2
 
+    _set_process_dpi_aware()
     port = _find_free_port(args.port)
     server = ThreadedServer((HOST, port), Handler)
     url = f"http://{HOST}:{port}/"
