@@ -1060,31 +1060,60 @@ def _find_free_port(start: int) -> int:
     return start
 
 
-def _launch_browser(url: str) -> None:
-    # Prefer Edge / Chrome --app mode for a chromeless window.
-    if os.name == "nt":
-        for exe in ("msedge.exe", "chrome.exe"):
-            full = shutil.which(exe)
-            if not full:
-                # also check the well-known install paths
-                for guess in (
-                    Path(os.environ.get("ProgramFiles", "")) / "Microsoft/Edge/Application/msedge.exe",
-                    Path(os.environ.get("ProgramFiles(x86)", "")) / "Microsoft/Edge/Application/msedge.exe",
-                    Path(os.environ.get("ProgramFiles", "")) / "Google/Chrome/Application/chrome.exe",
-                    Path(os.environ.get("ProgramFiles(x86)", "")) / "Google/Chrome/Application/chrome.exe",
-                ):
-                    if guess.is_file():
-                        full = str(guess)
-                        break
-            if full:
-                try:
-                    subprocess.Popen(
-                        [full, f"--app={url}", "--new-window"],
-                        creationflags=getattr(subprocess, "DETACHED_PROCESS", 0),
-                    )
-                    return
-                except Exception:  # noqa: BLE001
-                    pass
+def _find_chromium_exe() -> str | None:
+    """Locate Edge or Chrome on Windows."""
+    if os.name != "nt":
+        return None
+    for exe in ("msedge.exe", "chrome.exe"):
+        full = shutil.which(exe)
+        if full:
+            return full
+    for guess in (
+        Path(os.environ.get("ProgramFiles", "")) / "Microsoft/Edge/Application/msedge.exe",
+        Path(os.environ.get("ProgramFiles(x86)", "")) / "Microsoft/Edge/Application/msedge.exe",
+        Path(os.environ.get("ProgramFiles", "")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("ProgramFiles(x86)", "")) / "Google/Chrome/Application/chrome.exe",
+    ):
+        if guess.is_file():
+            return str(guess)
+    return None
+
+
+def _launch_browser_tracked(url: str) -> subprocess.Popen | None:
+    """Launch Edge/Chrome in --app mode under a dedicated user-data-dir.
+
+    Returns the Popen so the caller can wait on it. When the user closes
+    the window, that process exits and the caller can shut the server down.
+
+    A dedicated --user-data-dir is essential: without it, --app=URL on a
+    system that already has Edge open would just send a "open new window"
+    message to the existing Edge process, our Popen would return
+    immediately, and we'd think the window had already closed.
+    """
+    exe = _find_chromium_exe()
+    if not exe:
+        return None
+    import tempfile
+    user_data_dir = Path(tempfile.gettempdir()) / f"sift_browser_profile_{os.getpid()}"
+    try:
+        user_data_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
+    try:
+        return subprocess.Popen([
+            exe,
+            f"--app={url}",
+            f"--user-data-dir={user_data_dir}",
+            "--no-default-browser-check",
+            "--no-first-run",
+            "--disable-features=TranslateUI",
+        ])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _launch_browser_detached(url: str) -> None:
+    """Fallback: open the system default browser (we can't track lifecycle)."""
     webbrowser.open(url)
 
 
@@ -1109,18 +1138,61 @@ def main() -> int:
     server = ThreadedServer((HOST, port), Handler)
     url = f"http://{HOST}:{port}/"
     print(f"Sift running at {url}")
+
     if args.no_browser:
         print("(no-browser mode: open the URL above in any browser, "
               "or double-click open_ui.vbs)")
-    else:
-        print("Close the window or press Ctrl+C to stop.")
-        threading.Timer(0.4, lambda: _launch_browser(url)).start()
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            server.server_close()
+            print("Stopped.")
+        return 0
+
+    # GUI mode: server runs in a background thread; main thread tracks
+    # the browser process so that closing the window cleanly stops the app.
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+
+    browser_proc = _launch_browser_tracked(url)
+    if browser_proc is None:
+        # Couldn't spawn a tracked browser — best effort: open default browser
+        # and stay alive until Ctrl+C. Window-close-to-exit only works with
+        # Edge/Chrome.
+        print("[sift] Edge/Chrome not found; opening default browser. "
+              "App will keep running — kill via Task Manager when done.")
+        _launch_browser_detached(url)
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            server.shutdown()
+            server.server_close()
+        return 0
+
+    print("Sift window is open. Close it to exit.")
     try:
-        server.serve_forever()
+        browser_proc.wait()
     except KeyboardInterrupt:
-        pass
+        try:
+            browser_proc.terminate()
+        except Exception:  # noqa: BLE001
+            pass
     finally:
+        server.shutdown()
         server.server_close()
+        # Best-effort cleanup of the temp browser profile.
+        try:
+            import tempfile
+            shutil.rmtree(Path(tempfile.gettempdir()) /
+                          f"sift_browser_profile_{os.getpid()}",
+                          ignore_errors=True)
+        except Exception:  # noqa: BLE001
+            pass
         print("Stopped.")
     return 0
 

@@ -82,14 +82,44 @@ def main() -> int:
 
     exe_name = "sift.exe" if sys.platform == "win32" else "sift"
     exe = HERE / "dist" / exe_name
-    if exe.is_file():
-        size_mb = exe.stat().st_size / (1024 * 1024)
-        print(f"\nSuccess: {exe}  ({size_mb:.1f} MB)")
-        print("Double-click that file to launch the app.")
-        print("You can copy the single .exe anywhere — no Python needed on that machine.")
-    else:
+    if not exe.is_file():
         print("Build completed but the expected output file was not found.")
         return 1
+    size_mb = exe.stat().st_size / (1024 * 1024)
+    print(f"\nSuccess: {exe}  ({size_mb:.1f} MB)")
+
+    # Bundle the exe into a zip so the release looks like a typical
+    # portable Windows tool: a zip containing the exe and a short readme.
+    import zipfile
+    import textwrap
+    readme = textwrap.dedent(f"""\
+        Sift — find duplicates, similar photos, empty folders, and what's eating your disk.
+
+        How to use
+        ----------
+        1. Double-click `sift.exe`.
+        2. If Windows shows a "SmartScreen protected your PC" dialog, click
+           "More info" -> "Run anyway". (We are not yet code-signed.)
+        3. A chromeless window opens. Add a folder, run a scan.
+        4. Close the window to exit. Files moved to quarantine can be
+           restored anytime via the Restore button.
+
+        Privacy
+        -------
+        Sift runs entirely on your computer. No network calls, no telemetry,
+        no uploads. Your files never leave your machine.
+
+        Source: https://github.com/DatongJin/sift
+        """)
+    zip_name = "sift-win64.zip" if sys.platform == "win32" else "sift.zip"
+    zip_path = HERE / "dist" / zip_name
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        zf.write(exe, arcname=exe_name)
+        zf.writestr("README.txt", readme)
+    zip_mb = zip_path.stat().st_size / (1024 * 1024)
+    print(f"Packaged: {zip_path}  ({zip_mb:.1f} MB)")
+    print("\nBoth the bare exe and the zip are in dist/.")
+    print("Upload one (or both) as release assets on GitHub.")
     return 0
 
 
