@@ -8,10 +8,15 @@ goes through a quarantine you can restore from; the server only listens on
 
 ## Download
 
-[**Download Sift for Windows**](https://github.com/DatongJin/sift/releases/latest/download/sift.exe)
-(~16 MB, single .exe, no installer, no Python required).
+[**Download Sift for Windows**](https://github.com/DatongJin/sift/releases/latest/download/sift-win64.zip)
+(~16 MB zip). Unzip and double-click `sift.exe` — no installer, no Python required.
+Close the window to exit (no background process is left running).
 
-Also see the [landing page](https://datongjin.github.io/sift/) once the repo is public.
+First launch on Windows may show a SmartScreen "protected your PC" dialog because
+the binary is not yet code-signed; click **More info → Run anyway**.
+
+Bare `.exe` (no zip wrapper) is also available on the [releases page](https://github.com/DatongJin/sift/releases).
+Landing page: [datongjin.github.io/sift](https://datongjin.github.io/sift/).
 
 ## Features
 
