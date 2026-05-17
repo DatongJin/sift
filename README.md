@@ -18,6 +18,13 @@ the binary is not yet code-signed; click **More info → Run anyway**.
 Bare `.exe` (no zip wrapper) is also available on the [releases page](https://github.com/DatongJin/sift/releases).
 Landing page: [datongjin.github.io/sift](https://datongjin.github.io/sift/).
 
+## Documentation
+
+- [DEVELOPMENT.md](DEVELOPMENT.md) — full developer guide: architecture, every
+  module, the HTTP API, build/release, testing, how to add a scan mode.
+- [DECISIONS.md](DECISIONS.md) / [DECISIONS.zh.md](DECISIONS.zh.md) — design
+  decision records (options → choice → why); English and bilingual.
+
 ## Features
 
 | Mode | What it does |
